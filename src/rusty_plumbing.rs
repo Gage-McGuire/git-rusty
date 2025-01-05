@@ -96,7 +96,8 @@ pub fn write_tree(dir: &str) {
             let tree_sha = hash_object("tree", &file.0);
             tree_content.push_str(&format!("{} {}\0{}", &file.1, &file.0, tree_sha));
         } else {
-            let blob_sha = hash_object("blob", &file.0);
+            let contents = std::fs::read_to_string(&file.0).unwrap();
+            let blob_sha = hash_object("blob", &contents);
             tree_content.push_str(&format!("{} {}\0{}", &file.1, &file.0, blob_sha));
         }
     }
