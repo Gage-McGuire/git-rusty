@@ -8,12 +8,12 @@ pub fn read_file(path: &str) -> String {
     return file_content;
 }
 
-pub fn init_hash_object() {
+pub fn basic_hash_object() {
     print!("Enter file name: ");
     std::io::Write::flush(&mut std::io::stdout()).expect("flush failed!");
     let mut input = String::new();
     std::io::stdin().read_line(&mut input).unwrap();
     let content = read_file(input.trim());
-    let sha = rusty_plumbing::hash_object("blob",  content);
+    let sha = rusty_plumbing::hash_object("blob",  &content);
     println!("{}", sha)
 }

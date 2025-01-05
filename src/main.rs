@@ -13,7 +13,7 @@ fn main() {
         match command.trim() {
             "init" => rusty_commands::init(),
             "cat-file" => rusty_plumbing::cat_file(),
-            "hash-object" => rusty_helper::init_hash_object(),
+            "hash-object" => rusty_helper::basic_hash_object(),
             "ls-tree" => rusty_plumbing::ls_tree(),
             "write-tree" => rusty_plumbing::write_tree("testing"),
             "help" => rusty_commands::help(),

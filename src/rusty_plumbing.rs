@@ -18,15 +18,15 @@ pub fn cat_file() {
     let file = std::fs::read(format!(".git-rusty/objects/{}/{}", obj_dir, obj_file)).unwrap();
 
     // decode file
-    let mut d = ZlibDecoder::new(&file[..]);
-    let mut s = String::new();
-    d.read_to_string(&mut s).unwrap();
+    let mut decoder = ZlibDecoder::new(&file[..]);
+    let mut contents = String::new();
+    decoder.read_to_string(&mut contents).unwrap();
 
     // print file contents
-    println!("{}", s);
+    println!("{}", contents);
 }
 
-pub fn hash_object(object_type: &str, content: String) -> String {
+pub fn hash_object(object_type: &str, content: &String) -> String {
     // Create an object with the file content
     let length = content.len();
     let object_content = format!("{} {}\0{}", object_type, length, content);
@@ -53,7 +53,24 @@ pub fn hash_object(object_type: &str, content: String) -> String {
 }
 
 pub fn ls_tree() {
-    println!("Enter tree hash: ");
+    // get tree sha from user
+    print!("Enter tree sha: ");
+    std::io::Write::flush(&mut std::io::stdout()).expect("flush failed!");
+    let mut input = String::new();
+    std::io::stdin().read_line(&mut input).unwrap();
+
+    // format tree location
+    let obj_dir = input.trim()[0..2].to_string();
+    let obj_file = input.trim()[2..].to_string();
+    let file = std::fs::read(format!(".git-rusty/objects/{}/{}", obj_dir, obj_file)).unwrap();
+
+    // decode file
+    let mut decoder = ZlibDecoder::new(&file[..]);
+    let mut contents = String::new();
+    decoder.read_to_string(&mut contents).unwrap();
+
+    // print file contents
+    println!("{}", contents);
 }
 
 pub fn write_tree(dir: &str) {
@@ -62,7 +79,7 @@ pub fn write_tree(dir: &str) {
 
     // create a vector to store the files
     let mut files: Vec<(String, String)> = Vec::new();
-    let mut tree_content = Vec::new();
+    let mut tree_content = String::new();
 
     // iterate over the files and store the file path and mode
     for path in paths {
@@ -72,16 +89,18 @@ pub fn write_tree(dir: &str) {
         let mode = format!("{:0>6o}", permissions.mode());
         files.push((path.display().to_string(), mode.trim().to_string()));
     }
-    
+
+    // TODO: properly hash contents of files and directories
     for file in files {
-        if file.1 == "040755" {
-            let hash = hash_object("tree", file.0.clone());
-            tree_content.push(format!("040000 tree {} {}\n", hash, file.0));
+        if &file.1[..2] == "04" {
+            let tree_sha = hash_object("tree", &file.0);
+            tree_content.push_str(&format!("{} {}\0{}", &file.1, &file.0, tree_sha));
         } else {
-            let hash = hash_object("blob", file.0.clone());
-            tree_content.push(format!("100644 blob {} {}\n", hash, file.0));
+            let blob_sha = hash_object("blob", &file.0);
+            tree_content.push_str(&format!("{} {}\0{}", &file.1, &file.0, blob_sha));
         }
     }
 
-    println!("{:?}", tree_content);
+    let tree_sha = hash_object("tree", &tree_content);
+    println!("{}", tree_sha);
 }   
