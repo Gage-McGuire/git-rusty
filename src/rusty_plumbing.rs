@@ -1,5 +1,5 @@
-use flate2::{read::ZlibDecoder, write};
-use std::{io::prelude::*, path::Path};
+use flate2::read::ZlibDecoder;
+use std::io::prelude::*;
 use flate2::write::ZlibEncoder;
 use flate2::Compression;
 use sha1::{Digest, Sha1};
@@ -26,28 +26,22 @@ pub fn cat_file() {
     println!("{}", s);
 }
 
-pub fn hash_object(object_type: &str, path: String) -> String {
-    // Get the file path from the user
-    let input = path;
-
-    // Create a new path where the file is located and read the file content
-    // Then create a blob object with the file content
-    let path = Path::new(input.trim());
-    let file_content = std::fs::read_to_string(Path::new(path)).unwrap();
-    let length = file_content.len();
-    let blob_content = format!("{} {}\0{}", object_type, length, file_content);
+pub fn hash_object(object_type: &str, content: String) -> String {
+    // Create an object with the file content
+    let length = content.len();
+    let object_content = format!("{} {}\0{}", object_type, length, content);
 
     // Create a new hasher and hash the blob content
     // print the hash value of the blob content
     let mut hasher = Sha1::new();
-    hasher.update(&blob_content);
+    hasher.update(&object_content);
     let sha = format!("{:x}", hasher.finalize());
 
     // Create a new zlib encoder and compress the blob content
     // Create a new directory for the object 
     // and write the compressed content to the object file
     let mut e = ZlibEncoder::new(Vec::new(), Compression::default());
-    e.write_all(blob_content.as_bytes()).unwrap();
+    e.write_all(object_content.as_bytes()).unwrap();
     let compressed = e.finish().unwrap();
     let obj_dir = &sha[0..2];
     let obj_file = &sha[2..];
