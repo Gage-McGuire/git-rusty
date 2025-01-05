@@ -42,6 +42,16 @@ pub fn init() {
     println!("Initialized git-rusty repository successfully...");
 }
 
+pub fn help() {
+    println!("Available commands:\n");
+    println!("init - Initialize a new git-rusty repository");
+    println!("cat-file - Display the contents of a file");
+    println!("hash-object - Create a new object");
+    println!("ls-tree - List the contents of a tree object");
+    println!("help - Display this help message");
+    println!("exit - Exit the program\n");
+}
+
 pub fn exit(running: &mut bool) {
     println!("Exiting...");
     *running = false;

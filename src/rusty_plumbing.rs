@@ -1,8 +1,9 @@
-use flate2::read::ZlibDecoder;
+use flate2::{read::ZlibDecoder, write};
 use std::{io::prelude::*, path::Path};
 use flate2::write::ZlibEncoder;
 use flate2::Compression;
 use sha1::{Digest, Sha1};
+use std::os::unix::fs::PermissionsExt;
 
 pub fn cat_file() {
     // get file from user
@@ -25,26 +26,22 @@ pub fn cat_file() {
     println!("{}", s);
 }
 
-pub fn hash_object() {
-    // get file from user
-    print!("Enter file name: ");
-    std::io::Write::flush(&mut std::io::stdout()).expect("flush failed!");
-    let mut input = String::new();
-    std::io::stdin().read_line(&mut input).unwrap();
+pub fn hash_object(object_type: &str, path: String) -> String {
+    // Get the file path from the user
+    let input = path;
 
     // Create a new path where the file is located and read the file content
     // Then create a blob object with the file content
     let path = Path::new(input.trim());
     let file_content = std::fs::read_to_string(Path::new(path)).unwrap();
     let length = file_content.len();
-    let blob_content = format!("blob {}\0{}", length, file_content);
+    let blob_content = format!("{} {}\0{}", object_type, length, file_content);
 
     // Create a new hasher and hash the blob content
     // print the hash value of the blob content
     let mut hasher = Sha1::new();
     hasher.update(&blob_content);
     let sha = format!("{:x}", hasher.finalize());
-    println!("{}", sha);
 
     // Create a new zlib encoder and compress the blob content
     // Create a new directory for the object 
@@ -56,4 +53,41 @@ pub fn hash_object() {
     let obj_file = &sha[2..];
     std::fs::create_dir_all(format!(".git-rusty/objects/{}", obj_dir)).unwrap();
     std::fs::write(format!(".git-rusty/objects/{}/{}", obj_dir, obj_file), compressed).unwrap();
+
+    // return the hash value of the blob content
+    return sha;
 }
+
+pub fn ls_tree() {
+    println!("Enter tree hash: ");
+}
+
+pub fn write_tree(dir: &str) {
+    // get all files in the directory
+    let paths = std::fs::read_dir(dir).unwrap();
+
+    // create a vector to store the files
+    let mut files: Vec<(String, String)> = Vec::new();
+    let mut tree_content = Vec::new();
+
+    // iterate over the files and store the file path and mode
+    for path in paths {
+        let path = path.unwrap().path();
+        let metadata = std::fs::metadata(&path).unwrap();
+        let permissions = metadata.permissions();
+        let mode = format!("{:0>6o}", permissions.mode());
+        files.push((path.display().to_string(), mode.trim().to_string()));
+    }
+    
+    for file in files {
+        if file.1 == "040755" {
+            let hash = hash_object("tree", file.0.clone());
+            tree_content.push(format!("040000 tree {} {}\n", hash, file.0));
+        } else {
+            let hash = hash_object("blob", file.0.clone());
+            tree_content.push(format!("100644 blob {} {}\n", hash, file.0));
+        }
+    }
+
+    println!("{:?}", tree_content);
+}   
