@@ -8,7 +8,7 @@ pub fn read_file(path: &str) -> String {
     return file_content;
 }
 
-pub fn basic_hash_object() {
+pub fn hash_object() {
     print!("Enter file name: ");
     std::io::Write::flush(&mut std::io::stdout()).expect("flush failed!");
     let mut input = String::new();
@@ -16,4 +16,13 @@ pub fn basic_hash_object() {
     let content = read_file(input.trim());
     let sha = rusty_plumbing::hash_object("blob",  &content);
     println!("{}", sha)
+}
+
+pub fn write_tree() {
+    print!("Enter directory: ");
+    std::io::Write::flush(&mut std::io::stdout()).expect("flush failed!");
+    let mut input = String::new();
+    std::io::stdin().read_line(&mut input).unwrap();
+    let tree_sha = rusty_plumbing::write_tree(input.trim());
+    println!("{}", tree_sha);
 }

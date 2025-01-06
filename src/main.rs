@@ -13,9 +13,9 @@ fn main() {
         match command.trim() {
             "init" => rusty_commands::init(),
             "cat-file" => rusty_plumbing::cat_file(),
-            "hash-object" => rusty_helper::basic_hash_object(),
+            "hash-object" => rusty_helper::hash_object(),
             "ls-tree" => rusty_plumbing::ls_tree(),
-            "write-tree" => rusty_plumbing::write_tree("testing"),
+            "write-tree" => rusty_helper::write_tree(),
             "help" => rusty_commands::help(),
             "exit" => rusty_commands::exit(&mut running),
             _ => println!("Unknown command: {}Enter help to see available commands...", command),

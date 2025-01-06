@@ -7,7 +7,7 @@ use std::os::unix::fs::PermissionsExt;
 
 pub fn cat_file() {
     // get file from user
-    print!("Enter file name: ");
+    print!("Enter file sha: ");
     std::io::Write::flush(&mut std::io::stdout()).expect("flush failed!");
     let mut input = String::new();
     std::io::stdin().read_line(&mut input).unwrap();
@@ -73,7 +73,7 @@ pub fn ls_tree() {
     println!("{}", contents);
 }
 
-pub fn write_tree(dir: &str) {
+pub fn write_tree(dir: &str) -> String {
     // get all files in the directory
     let paths = std::fs::read_dir(dir).unwrap();
 
@@ -84,16 +84,19 @@ pub fn write_tree(dir: &str) {
     // iterate over the files and store the file path and mode
     for path in paths {
         let path = path.unwrap().path();
+        let file_name = path.file_name().unwrap().to_str().unwrap();
         let metadata = std::fs::metadata(&path).unwrap();
         let permissions = metadata.permissions();
         let mode = format!("{:0>6o}", permissions.mode());
-        files.push((path.display().to_string(), mode.trim().to_string()));
+        if !file_name.starts_with("."){
+            files.push((path.display().to_string(), mode.trim().to_string()));
+        }
     }
 
     // TODO: properly hash contents of files and directories
     for file in files {
         if &file.1[..2] == "04" {
-            let tree_sha = hash_object("tree", &file.0);
+            let tree_sha = write_tree(&file.0);
             tree_content.push_str(&format!("{} {}\0{}", &file.1, &file.0, tree_sha));
         } else {
             let contents = std::fs::read_to_string(&file.0).unwrap();
@@ -103,5 +106,5 @@ pub fn write_tree(dir: &str) {
     }
 
     let tree_sha = hash_object("tree", &tree_content);
-    println!("{}", tree_sha);
+    return tree_sha;
 }   
