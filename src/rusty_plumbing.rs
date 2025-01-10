@@ -7,7 +7,7 @@ use std::os::unix::fs::PermissionsExt;
 
 pub fn cat_file() {
     // get file from user
-    print!("Enter file sha: ");
+    print!("Enter blob sha: ");
     std::io::Write::flush(&mut std::io::stdout()).expect("flush failed!");
     let mut input = String::new();
     std::io::stdin().read_line(&mut input).unwrap();
@@ -22,8 +22,9 @@ pub fn cat_file() {
     let mut contents = String::new();
     decoder.read_to_string(&mut contents).unwrap();
 
-    // print file contents
-    println!("{}", contents);
+    let blob_info: Vec<&str> = contents.split("\0").collect();
+    println!("{}", blob_info[0]);
+    println!("{}", blob_info[1]);
 }
 
 pub fn hash_object(object_type: &str, content: &String) -> String {
@@ -69,8 +70,26 @@ pub fn ls_tree() {
     let mut contents = String::new();
     decoder.read_to_string(&mut contents).unwrap();
 
-    // print file contents
-    println!("{}", contents);
+    // split the contents for printing
+    match contents.split_once("\0") {
+        Some((tree_info, content)) => {
+            println!("{}", tree_info);
+            let lines: Vec<&str> = content.split("\n").collect();
+            for line in lines {
+                if line != "" {
+                    let split_line: Vec<&str> = line.split(" ").collect();
+                    let split_file: Vec<&str> = split_line[1].split("\0").collect();
+                    let mode = split_line[0];
+                    let file = split_file[0];
+                    let sha = split_file[1];
+                    println!("Mode: {} Name: {} Sha: {}", mode, file, sha);
+                }
+            }
+        },
+        None => {
+            println!("Invalid tree object");
+        }
+    };
 }
 
 pub fn write_tree(dir: &str) -> String {
@@ -93,18 +112,118 @@ pub fn write_tree(dir: &str) -> String {
         }
     }
 
-    // TODO: properly hash contents of files and directories
+    // iterate over the files and check the mode
+    // if the mode is a tree (040755), call write_tree recursively
+    // if the mode is a blob, hash the object
     for file in files {
         if &file.1[..2] == "04" {
             let tree_sha = write_tree(&file.0);
-            tree_content.push_str(&format!("{} {}\0{}", &file.1, &file.0, tree_sha));
+            tree_content.push_str(&format!("{} {}\0{}\n", &file.1, &file.0, tree_sha));
         } else {
             let contents = std::fs::read_to_string(&file.0).unwrap();
             let blob_sha = hash_object("blob", &contents);
-            tree_content.push_str(&format!("{} {}\0{}", &file.1, &file.0, blob_sha));
+            tree_content.push_str(&format!("{} {}\0{}\n", &file.1, &file.0, blob_sha));
         }
     }
 
+    // return final tree sha
     let tree_sha = hash_object("tree", &tree_content);
     return tree_sha;
-}   
+}
+
+pub fn commit_tree() {
+    print!("Enter tree sha: ");
+    std::io::Write::flush(&mut std::io::stdout()).expect("flush failed!");
+    let mut tree_sha = String::new();
+    std::io::stdin().read_line(&mut tree_sha).unwrap();
+
+    print!("Enter parent commit sha (if any, otherwise press enter): ");
+    std::io::Write::flush(&mut std::io::stdout()).expect("flush failed!");
+    let mut parent_sha = String::new();
+    std::io::stdin().read_line(&mut parent_sha).unwrap();
+
+    print!("Enter author: ");
+    std::io::Write::flush(&mut std::io::stdout()).expect("flush failed!");
+    let mut author = String::new();
+    std::io::stdin().read_line(&mut author).unwrap();
+
+    print!("Enter author email: ");
+    std::io::Write::flush(&mut std::io::stdout()).expect("flush failed!");
+    let mut author_email = String::new();
+    std::io::stdin().read_line(&mut author_email).unwrap();
+
+    print!("Enter committer: ");
+    std::io::Write::flush(&mut std::io::stdout()).expect("flush failed!");
+    let mut committer = String::new();
+    std::io::stdin().read_line(&mut committer).unwrap();
+
+    print!("Enter committer email: ");
+    std::io::Write::flush(&mut std::io::stdout()).expect("flush failed!");
+    let mut committer_email = String::new();
+    std::io::stdin().read_line(&mut committer_email).unwrap();
+
+    print!("Enter commit message: ");
+    std::io::Write::flush(&mut std::io::stdout()).expect("flush failed!");
+    let mut commit_message = String::new();
+    std::io::stdin().read_line(&mut commit_message).unwrap();
+
+    let mut commit_content = String::new();
+    commit_content.push_str(&format!("tree {}\n", tree_sha.trim()));
+    commit_content.push_str(&format!("parent {}\n", parent_sha.trim()));
+    commit_content.push_str(&format!("author {} <{}>\n", author.trim(), author_email.trim()));
+    commit_content.push_str(&format!("committer {} <{}>\n", committer.trim(), committer_email.trim()));
+    commit_content.push_str(&format!("\n{}", commit_message.trim()));
+
+    let commit_sha = hash_object("commit", &commit_content);
+    let ref_location = std::fs::read_to_string(".git-rusty/HEAD").unwrap();
+    let ref_location = ref_location.split(": ").collect::<Vec<&str>>()[1].trim();
+    let branch = ref_location.split("/").collect::<Vec<&str>>()[2];
+    std::fs::write(format!(".git-rusty/{}", ref_location), commit_sha).unwrap();
+
+    println!("Changes commited to {} branch", branch);
+}
+
+pub fn checkout() {
+    print!("Enter branch name: ");
+    std::io::Write::flush(&mut std::io::stdout()).expect("flush failed!");
+    let mut branch_name = String::new();
+    std::io::stdin().read_line(&mut branch_name).unwrap();
+
+    let refs_file = format!(".git-rusty/refs/heads/{}", branch_name.trim());
+    let refs_obj = std::fs::read_to_string(refs_file).unwrap();
+    let obj_dir = refs_obj[0..2].trim().to_string();
+    let obj_file = refs_obj.trim()[2..].to_string();
+    let file = std::fs::read(format!(".git-rusty/objects/{}/{}", obj_dir, obj_file)).unwrap();
+    
+    let mut decoder = ZlibDecoder::new(&file[..]);
+    let mut commit_info = String::new();
+    decoder.read_to_string(&mut commit_info).unwrap();
+
+    println!("{}", commit_info);
+
+    let _ = std::fs::write(".git-rusty/HEAD", format!("ref: refs/heads/{}", branch_name.trim()));
+}
+
+pub fn clone() {
+    print!("Enter commit sha: ");
+    std::io::Write::flush(&mut std::io::stdout()).expect("flush failed!");
+    let mut commit_sha = String::new();
+    std::io::stdin().read_line(&mut commit_sha).unwrap();
+
+
+}
+
+pub fn branch() {
+    print!("Enter branch name: ");
+    std::io::Write::flush(&mut std::io::stdout()).expect("flush failed!");
+    let mut branch = String::new();
+    std::io::stdin().read_line(&mut branch).unwrap();
+
+    let head = std::fs::read_to_string(".git-rusty/HEAD").unwrap();
+    let head = head.split(": ").collect::<Vec<&str>>()[1].trim();
+    let current_branch = format!(".git-rusty/{}", head.trim());
+    let current_commit = std::fs::read_to_string(current_branch).unwrap();
+    let refs_file = format!(".git-rusty/refs/heads/{}", branch.trim());
+    std::fs::write(refs_file, current_commit).unwrap();
+    println!("Branch {} created", branch.trim());
+}

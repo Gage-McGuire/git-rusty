@@ -6,6 +6,7 @@ pub fn init() {
     let git_rusty = fs::create_dir(".git-rusty");
     let objects = fs::create_dir(".git-rusty/objects");
     let refs = fs::create_dir(".git-rusty/refs");
+    let refs_heads = fs::create_dir(".git-rusty/refs/heads");
     let head = fs::write(".git-rusty/HEAD", "ref: refs/heads/main\n");
     match git_rusty {
         Ok(_) => println!("Created .git-rusty"),
@@ -25,6 +26,13 @@ pub fn init() {
         Ok(_) => println!("Created .git-rusty/refs"),
         Err(e) => {
             println!("Error creating .git-rusty/refs: {}", e);
+            init_ok = false;
+        },
+    }
+    match refs_heads {
+        Ok(_) => println!("Created .git-rusty/refs/heads"),
+        Err(e) => {
+            println!("Error creating .git-rusty/refs/heads: {}", e);
             init_ok = false;
         },
     }

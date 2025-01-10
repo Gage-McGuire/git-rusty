@@ -4,7 +4,7 @@ use crate::rusty_plumbing;
 pub fn read_file(path: &str) -> String {
     // Read the file content
     let path = Path::new(path.trim());
-    let file_content = std::fs::read_to_string(Path::new(path)).unwrap();
+    let file_content = std::fs::read_to_string(path).unwrap();
     return file_content;
 }
 
