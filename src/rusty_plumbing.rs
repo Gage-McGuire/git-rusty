@@ -5,6 +5,8 @@ use flate2::Compression;
 use sha1::{Digest, Sha1};
 use std::os::unix::fs::PermissionsExt;
 
+use crate::rusty_helper;
+
 pub fn cat_file() {
     // get file from user
     print!("Enter blob sha: ");
@@ -54,42 +56,15 @@ pub fn hash_object(object_type: &str, content: &String) -> String {
 }
 
 pub fn ls_tree() {
-    // get tree sha from user
     print!("Enter tree sha: ");
     std::io::Write::flush(&mut std::io::stdout()).expect("flush failed!");
     let mut input = String::new();
     std::io::stdin().read_line(&mut input).unwrap();
-
-    // format tree location
-    let obj_dir = input.trim()[0..2].to_string();
-    let obj_file = input.trim()[2..].to_string();
-    let file = std::fs::read(format!(".git-rusty/objects/{}/{}", obj_dir, obj_file)).unwrap();
-
-    // decode file
-    let mut decoder = ZlibDecoder::new(&file[..]);
-    let mut contents = String::new();
-    decoder.read_to_string(&mut contents).unwrap();
-
-    // split the contents for printing
-    match contents.split_once("\0") {
-        Some((tree_info, content)) => {
-            println!("{}", tree_info);
-            let lines: Vec<&str> = content.split("\n").collect();
-            for line in lines {
-                if line != "" {
-                    let split_line: Vec<&str> = line.split(" ").collect();
-                    let split_file: Vec<&str> = split_line[1].split("\0").collect();
-                    let mode = split_line[0];
-                    let file = split_file[0];
-                    let sha = split_file[1];
-                    println!("Mode: {} Name: {} Sha: {}", mode, file, sha);
-                }
-            }
-        },
-        None => {
-            println!("Invalid tree object");
-        }
-    };
+    let tree_sha = input.trim();
+    let tree = rusty_helper::get_tree_vec(tree_sha);
+    for line in tree {
+        println!("Mode: {} Name: {} Sha: {}", line.0, line.1, line.2);
+    }
 }
 
 pub fn write_tree(dir: &str) -> String {
@@ -142,26 +117,6 @@ pub fn commit_tree() {
     let mut parent_sha = String::new();
     std::io::stdin().read_line(&mut parent_sha).unwrap();
 
-    print!("Enter author: ");
-    std::io::Write::flush(&mut std::io::stdout()).expect("flush failed!");
-    let mut author = String::new();
-    std::io::stdin().read_line(&mut author).unwrap();
-
-    print!("Enter author email: ");
-    std::io::Write::flush(&mut std::io::stdout()).expect("flush failed!");
-    let mut author_email = String::new();
-    std::io::stdin().read_line(&mut author_email).unwrap();
-
-    print!("Enter committer: ");
-    std::io::Write::flush(&mut std::io::stdout()).expect("flush failed!");
-    let mut committer = String::new();
-    std::io::stdin().read_line(&mut committer).unwrap();
-
-    print!("Enter committer email: ");
-    std::io::Write::flush(&mut std::io::stdout()).expect("flush failed!");
-    let mut committer_email = String::new();
-    std::io::stdin().read_line(&mut committer_email).unwrap();
-
     print!("Enter commit message: ");
     std::io::Write::flush(&mut std::io::stdout()).expect("flush failed!");
     let mut commit_message = String::new();
@@ -170,8 +125,50 @@ pub fn commit_tree() {
     let mut commit_content = String::new();
     commit_content.push_str(&format!("tree {}\n", tree_sha.trim()));
     commit_content.push_str(&format!("parent {}\n", parent_sha.trim()));
-    commit_content.push_str(&format!("author {} <{}>\n", author.trim(), author_email.trim()));
-    commit_content.push_str(&format!("committer {} <{}>\n", committer.trim(), committer_email.trim()));
+    commit_content.push_str(&format!("\n{}", commit_message.trim()));
+
+    let commit_sha = hash_object("commit", &commit_content);
+    let ref_location = std::fs::read_to_string(".git-rusty/HEAD").unwrap();
+    let ref_location = ref_location.split(": ").collect::<Vec<&str>>()[1].trim();
+    let branch = ref_location.split("/").collect::<Vec<&str>>()[2];
+    std::fs::write(format!(".git-rusty/{}", ref_location), commit_sha).unwrap();
+
+    println!("Changes commited to {} branch", branch);
+}
+
+pub fn commit() {
+    print!("Enter working directory: ");
+    std::io::Write::flush(&mut std::io::stdout()).expect("flush failed!");
+    let mut working_dir = String::new();
+    std::io::stdin().read_line(&mut working_dir).unwrap();
+
+    let tree_sha = write_tree(working_dir.trim());
+    let current_head = rusty_helper::get_current_head();
+    let parent_commit_sha = std::fs::read_to_string(format!(".git-rusty/{}", current_head)).unwrap();
+    if parent_commit_sha != "0000000000000000000000000000000000000000"{
+        let parent_obj_dir = parent_commit_sha[0..2].trim().to_string();
+        let parent_obj_file = parent_commit_sha.trim()[2..].to_string();
+        let file = std::fs::read(format!(".git-rusty/objects/{}/{}", parent_obj_dir, parent_obj_file)).unwrap();
+        let mut decoder = ZlibDecoder::new(&file[..]);
+        let mut parent_commit_info = String::new();
+        decoder.read_to_string(&mut parent_commit_info).unwrap();
+
+        let parent_tree_sha = parent_commit_info.split("\0").collect::<Vec<&str>>()[1].split(" ").collect::<Vec<&str>>()[1].split("\n").collect::<Vec<&str>>()[0];
+
+        if tree_sha == parent_tree_sha {
+            println!("No changes to commit");
+            return;
+        }
+    }
+
+    print!("Enter commit message: ");
+    std::io::Write::flush(&mut std::io::stdout()).expect("flush failed!");
+    let mut commit_message = String::new();
+    std::io::stdin().read_line(&mut commit_message).unwrap();
+
+    let mut commit_content = String::new();
+    commit_content.push_str(&format!("tree {}\n", tree_sha.trim()));
+    commit_content.push_str(&format!("parent {}\n", parent_commit_sha.trim()));
     commit_content.push_str(&format!("\n{}", commit_message.trim()));
 
     let commit_sha = hash_object("commit", &commit_content);
@@ -199,9 +196,12 @@ pub fn checkout() {
     let mut commit_info = String::new();
     decoder.read_to_string(&mut commit_info).unwrap();
 
-    println!("{}", commit_info);
-
     let _ = std::fs::write(".git-rusty/HEAD", format!("ref: refs/heads/{}", branch_name.trim()));
+
+    let tree_sha = commit_info.split("\0").collect::<Vec<&str>>()[1].split(" ").collect::<Vec<&str>>()[1].split("\n").collect::<Vec<&str>>()[0];
+    let _ = rusty_helper::remove_working_dir(tree_sha);
+    let _ = rusty_helper::write_working_dir(tree_sha);
+    //println!("Switched to {} branch", branch_name.trim());
 }
 
 pub fn clone() {
@@ -209,8 +209,6 @@ pub fn clone() {
     std::io::Write::flush(&mut std::io::stdout()).expect("flush failed!");
     let mut commit_sha = String::new();
     std::io::stdin().read_line(&mut commit_sha).unwrap();
-
-
 }
 
 pub fn branch() {
