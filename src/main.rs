@@ -21,6 +21,7 @@ fn main() {
             "checkout" => rusty_plumbing::checkout(),
             "clone" => rusty_plumbing::clone(),
             "branch" => rusty_plumbing::branch(),
+            "status" => rusty_plumbing::status(),
             "help" => rusty_commands::help(),
             "exit" => rusty_commands::exit(&mut running),
             _ => println!("Unknown command: {}Enter help to see available commands...", command),

@@ -225,3 +225,7 @@ pub fn branch() {
     std::fs::write(refs_file, current_commit).unwrap();
     println!("Branch {} created", branch.trim());
 }
+
+pub fn status() {
+    println!("On branch main");
+}
