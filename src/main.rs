@@ -17,6 +17,7 @@ fn main() {
             "ls-tree" => rusty_plumbing::ls_tree(),
             "write-tree" => rusty_helper::write_tree(),
             "commit-tree" => rusty_plumbing::commit_tree(),
+            "add" => rusty_plumbing::add(),
             "commit" => rusty_plumbing::commit(),
             "checkout" => rusty_plumbing::checkout(),
             "clone" => rusty_plumbing::clone(),

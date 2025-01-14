@@ -226,6 +226,10 @@ pub fn branch() {
     println!("Branch {} created", branch.trim());
 }
 
+pub fn add() {
+    println!("add");
+}
+
 pub fn status() {
     println!("On branch main");
 }
