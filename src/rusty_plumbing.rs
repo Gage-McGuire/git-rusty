@@ -227,9 +227,12 @@ pub fn branch() {
 }
 
 pub fn add() {
-    println!("add");
+    
 }
 
 pub fn status() {
-    println!("On branch main");
+    let head = std::fs::read_to_string(".git-rusty/HEAD").unwrap();
+    let head = head.split(": ").collect::<Vec<&str>>()[1].trim();
+    let head = head.split("/").collect::<Vec<&str>>()[2];
+    println!("Current branch: {}", head);
 }
